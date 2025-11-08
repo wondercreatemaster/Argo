@@ -104,9 +104,11 @@ struct DiscussionsView: View {
                     HStack(spacing: 8) {
                         TextField("Type a message…", text: $newMessage)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .onSubmit { if let id = selectedID { sendMessage(for: id) } }
+                            .onSubmit {
+                                if let id = selectedID { sendMessageStreaming(for: id) }
+                            }
                         Button {
-                            if let id = selectedID { sendMessage(for: id) }
+                            if let id = selectedID { sendMessageStreaming(for: id) }
                         } label: { Image(systemName: "paperplane.fill") }
                         .buttonStyle(.bordered)
                     }
@@ -158,6 +160,40 @@ struct DiscussionsView: View {
             }
         }
     }
+    
+    private func sendMessageStreaming(for id: String) {
+        let text = newMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        newMessage = ""
+
+        // Immediately show the user message
+        chatMessages.append(ChatMessage(role: "user", text: text))
+
+        Task { @MainActor in
+            var assistantIndex: Int? = nil
+
+            do {
+                try await APIClient.streamDiscussionMessage(id, message: text) { chunk in
+                    // This closure runs off-main; re-enter MainActor for UI updates
+                    Task { @MainActor in
+                        if let idx = assistantIndex {
+                            chatMessages[idx].text += chunk
+                        } else {
+                            let msg = ChatMessage(role: "assistant", text: chunk)
+                            chatMessages.append(msg)
+                            assistantIndex = chatMessages.count - 1
+                        }
+                    }
+                }
+            } catch {
+                chatMessages.append(ChatMessage(role: "system",
+                                                text: "❌ \(error.localizedDescription)"))
+            }
+        }
+    }
+
+
+
 
     private func sendMessage(for id: String) {
         let text = newMessage.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -283,7 +319,7 @@ struct DiscussionDetail: Codable {
 struct ChatMessage: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
     let role: String
-    let text: String
+    var text: String
 
     enum CodingKeys: String, CodingKey {
         case role, text

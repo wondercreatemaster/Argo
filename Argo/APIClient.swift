@@ -9,6 +9,13 @@ struct CreateDiscussionRequest: Codable {
     let tags: [String]
 }
 
+struct SSEChunk: Codable {
+    let chunk: String?
+    let full_text: String?
+    let done: Bool?
+    let error: String?
+}
+
 private struct CreateDiscussionResponse: Codable { let id: String }
 
 enum APIClient {
@@ -78,6 +85,44 @@ enum APIClient {
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
         return try JSONDecoder().decode(ChatResponse.self, from: data)
     }
+    
+    static func streamDiscussionMessage(
+            _ discussionID: String,
+            message: String,
+            onChunk: @escaping (String) -> Void
+        ) async throws {
+            guard let url = URL(string: "/discussions/\(discussionID)/chat", relativeTo: APIConfig.baseURL) else { return }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(["message": message])
+
+            let (stream, response) = try await URLSession.shared.bytes(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw URLError(.badServerResponse)
+            }
+
+            for try await line in stream.lines {
+                guard line.hasPrefix("data:") else { continue }
+                let trimmed = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                guard let data = trimmed.data(using: .utf8) else { continue }
+
+                if let chunkObj = try? JSONDecoder().decode(SSEChunk.self, from: data) {
+                    if let error = chunkObj.error {
+                        throw NSError(domain: "SSEError", code: 1, userInfo: [NSLocalizedDescriptionKey: error])
+                    }
+                    if chunkObj.done == true { break }
+                    if let chunk = chunkObj.chunk {
+                        await MainActor.run {
+                            onChunk(chunk)
+                        }
+                    }
+                }
+            }
+        }
+    
     
     static func deleteDiscussion(_ discussionID: String) async throws {
         var req = URLRequest(url: APIConfig.baseURL.appendingPathComponent("/discussions/\(discussionID)"))

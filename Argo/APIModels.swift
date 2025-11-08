@@ -6,14 +6,15 @@ struct ContactListItemDTO: Codable, Identifiable, Hashable {
     let display_name: String
     let last_message_ts: String?
     let last_message_snippet: String?
-    let total_messages: Int
+    let total_messages: Int?
 }
 
 struct MessageDTO: Codable, Identifiable, Hashable {
-    var id: String { ts + direction + String(text.hashValue) }
-    let ts: String
-    let direction: String
+    var id: String { (timestamp ?? "") + role + String(text.hashValue) }
+    let timestamp: String?
+    let role: String
     let text: String
+    let sender: String?
 }
 
 struct ContactDTO: Codable, Identifiable {

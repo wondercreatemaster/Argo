@@ -94,13 +94,13 @@ struct MessageRow: View {
     let message: MessageDTO
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Text(message.direction.uppercased())
+            Text(message.role.uppercased())
                 .font(.caption2).padding(.vertical, 2).padding(.horizontal, 6)
-                .background(message.direction == "in" ? Color.blue.opacity(0.15) : Color.green.opacity(0.15))
+                .background(message.role == "other" ? Color.blue.opacity(0.15) : Color.green.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
             VStack(alignment: .leading, spacing: 2) {
                 Text(message.text)
-                Text(message.ts).font(.caption).foregroundColor(.secondary)
+                Text(message.timestamp!).font(.caption).foregroundColor(.secondary)
             }
             Spacer()
         }

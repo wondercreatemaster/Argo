@@ -132,5 +132,31 @@ enum APIClient {
             throw URLError(.badServerResponse)
         }
     }
+    
+    // MARK: - Unread Messages API
+    
+    static func fetchUnreadMessages() async throws -> [UnreadMessageDTO] {
+        let url = APIConfig.baseURL.appendingPathComponent("/unread")
+        let (data, resp) = try await URLSession.shared.data(from: url)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder().decode([UnreadMessageDTO].self, from: data)
+    }
+    
+    static func fetchUnreadCount() async throws -> Int {
+        let url = APIConfig.baseURL.appendingPathComponent("/unread/count")
+        let (data, resp) = try await URLSession.shared.data(from: url)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let result = try JSONDecoder().decode(UnreadCountResponse.self, from: data)
+        return result.count
+    }
+    
+    static func markAsRead(contactID: String, messageID: Int) async throws {
+        var req = URLRequest(url: APIConfig.baseURL.appendingPathComponent("/unread/mark-read"))
+        req.httpMethod = "POST"
+        req.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(MarkReadRequestDTO(contact_id: contactID, message_id: messageID))
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+    }
 
 }

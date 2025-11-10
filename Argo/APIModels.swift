@@ -33,3 +33,21 @@ struct AnalysisResultDTO: Codable {
     let facts: [String]
     let history_summary: String
 }
+
+struct UnreadMessageDTO: Codable, Identifiable {
+    var id: String { "\(contact_id)-\(message_id)" }
+    let contact_id: String
+    let display_name: String
+    let message: String
+    let timestamp: String
+    let message_id: Int
+}
+
+struct UnreadCountResponse: Codable {
+    let count: Int
+}
+
+struct MarkReadRequestDTO: Codable {
+    let contact_id: String
+    let message_id: Int
+}
